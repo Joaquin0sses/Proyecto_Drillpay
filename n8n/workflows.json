@@ -1,0 +1,217 @@
+[
+    {
+        "name": "DrillPay - Invoice Processing",
+        "nodes": [
+            {
+                "parameters": {
+                    "path": "upload-invoice",
+                    "responseMode": "lastNode",
+                    "options": {}
+                },
+                "name": "Webhook",
+                "type": "n8n-nodes-base.webhook",
+                "typeVersion": 1,
+                "position": [
+                    100,
+                    300
+                ]
+            },
+            {
+                "parameters": {
+                    "operation": "executeQuery",
+                    "query": "INSERT INTO invoices (client_id, amount, issue_date, due_date, status) VALUES ($1, $2, $3, $4, 'PENDING') RETURNING id;"
+                },
+                "name": "Postgres Insert",
+                "type": "n8n-nodes-base.postgres",
+                "typeVersion": 1,
+                "position": [
+                    300,
+                    300
+                ],
+                "credentials": {
+                    "postgres": {
+                        "id": "1",
+                        "name": "DrillPay DB"
+                    }
+                }
+            }
+        ],
+        "connections": {
+            "Webhook": {
+                "main": [
+                    [
+                        {
+                            "node": "Postgres Insert",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            }
+        }
+    },
+    {
+        "name": "DrillPay - Email Alerts",
+        "nodes": [
+            {
+                "parameters": {
+                    "triggerTimes": {
+                        "item": [
+                            {
+                                "hour": 9
+                            }
+                        ]
+                    }
+                },
+                "name": "Cron",
+                "type": "n8n-nodes-base.cron",
+                "typeVersion": 1,
+                "position": [
+                    100,
+                    300
+                ]
+            },
+            {
+                "parameters": {
+                    "operation": "executeQuery",
+                    "query": "SELECT * FROM invoices WHERE due_date < NOW() AND status = 'PENDING';"
+                },
+                "name": "Get Overdue",
+                "type": "n8n-nodes-base.postgres",
+                "typeVersion": 1,
+                "position": [
+                    300,
+                    300
+                ]
+            },
+            {
+                "parameters": {
+                    "fromEmail": "admin@drillpay.com",
+                    "toEmail": "={{$node[\"Get Overdue\"].json[\"client_email\"]}}",
+                    "subject": "Overdue Invoice Alert",
+                    "text": "Your invoice {{$node[\"Get Overdue\"].json[\"id\"]}} is overdue."
+                },
+                "name": "Send Email",
+                "type": "n8n-nodes-base.emailSend",
+                "typeVersion": 1,
+                "position": [
+                    500,
+                    300
+                ]
+            }
+        ],
+        "connections": {
+            "Cron": {
+                "main": [
+                    [
+                        {
+                            "node": "Get Overdue",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "Get Overdue": {
+                "main": [
+                    [
+                        {
+                            "node": "Send Email",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            }
+        }
+    },
+    {
+        "name": "DrillPay - AI Risk Analysis",
+        "nodes": [
+            {
+                "parameters": {
+                    "triggerTimes": {
+                        "item": [
+                            {
+                                "hour": 2
+                            }
+                        ]
+                    }
+                },
+                "name": "Daily Trigger",
+                "type": "n8n-nodes-base.cron",
+                "typeVersion": 1,
+                "position": [
+                    100,
+                    300
+                ]
+            },
+            {
+                "parameters": {
+                    "url": "http://ai_engine:5001/predict",
+                    "method": "POST",
+                    "bodyParametersUi": {
+                        "parameter": [
+                            {
+                                "name": "avg_days_overdue",
+                                "value": "10"
+                            },
+                            {
+                                "name": "paid_ratio",
+                                "value": "0.8"
+                            },
+                            {
+                                "name": "total_invoices",
+                                "value": "5"
+                            }
+                        ]
+                    }
+                },
+                "name": "AI Prediction",
+                "type": "n8n-nodes-base.httpRequest",
+                "typeVersion": 1,
+                "position": [
+                    300,
+                    300
+                ]
+            },
+            {
+                "parameters": {
+                    "operation": "executeQuery",
+                    "query": "INSERT INTO predictions (client_id, risk_score) VALUES (1, {{$json[\"risk_score\"]}});"
+                },
+                "name": "Save Prediction",
+                "type": "n8n-nodes-base.postgres",
+                "typeVersion": 1,
+                "position": [
+                    500,
+                    300
+                ]
+            }
+        ],
+        "connections": {
+            "Daily Trigger": {
+                "main": [
+                    [
+                        {
+                            "node": "AI Prediction",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            },
+            "AI Prediction": {
+                "main": [
+                    [
+                        {
+                            "node": "Save Prediction",
+                            "type": "main",
+                            "index": 0
+                        }
+                    ]
+                ]
+            }
+        }
+    }
+]

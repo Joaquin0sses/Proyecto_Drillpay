@@ -1,0 +1,98 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: drillpay_db
+    environment:
+      POSTGRES_USER: drillpay
+      POSTGRES_PASSWORD: drillpay_password
+      POSTGRES_DB: drillpay_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - drillpay_net
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: drillpay_pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@drillpay.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - drillpay_net
+
+  backend:
+    build: ./backend
+    container_name: drillpay_backend
+    environment:
+      DATABASE_URL: postgresql://drillpay:drillpay_password@postgres:5432/drillpay_db
+      SECRET_KEY: supersecretkey
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+      AI_SERVICE_URL: http://ai_engine:5001
+    ports:
+      - "8000:8000"
+    depends_on:
+      - postgres
+      - ai_engine
+    volumes:
+      - ./backend:/app
+    networks:
+      - drillpay_net
+
+  frontend:
+    build: ./frontend
+    container_name: drillpay_frontend
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - drillpay_net
+
+  ai_engine:
+    build: ./ai_engine
+    container_name: drillpay_ai
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./ai_engine:/app
+    networks:
+      - drillpay_net
+
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    container_name: drillpay_n8n
+    environment:
+      - N8N_HOST=n8n
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - NODE_ENV=production
+      - WEBHOOK_URL=http://localhost:5678/
+      - GENERIC_TIMEZONE=America/Santiago
+    ports:
+      - "5678:5678"
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./n8n/workflows.json:/home/node/workflows.json
+    networks:
+      - drillpay_net
+
+networks:
+  drillpay_net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  n8n_data:
