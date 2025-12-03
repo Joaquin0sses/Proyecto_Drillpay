@@ -14,6 +14,7 @@ router = APIRouter(
 class TemplateUpdate(BaseModel):
     subject: str
     body: str
+    include_table: bool = False
 
 @router.get("/template")
 def get_template(db: Session = Depends(database.get_db), current_user: models.User = Depends(auth.get_current_user)):
@@ -35,6 +36,7 @@ def update_template(data: TemplateUpdate, db: Session = Depends(database.get_db)
     
     template.subject = data.subject
     template.body = data.body
+    template.include_table = 1 if data.include_table else 0
     db.commit()
     return {"message": "Template updated"}
 
@@ -62,17 +64,48 @@ def send_reminder(client_id: int, db: Session = Depends(database.get_db), curren
         
     # Format message
     subject = template.subject
-    body = template.body.format(
+    body_content = template.body.format(
         cliente=client.name,
-        monto=f"${total_amount:,.2f}",
+        monto=f"${total_amount:,.0f}",
         cantidad_facturas=len(invoices)
     )
+
+    # Generate HTML Table if requested
+    html_table = ""
+    if template.include_table:
+        html_table = """
+        <br>
+        <h3>Detalle de Facturas Vencidas</h3>
+        <table style="width:100%; border-collapse: collapse; border: 1px solid #ddd; font-family: Arial, sans-serif;">
+            <thead style="background-color: #f2f2f2;">
+                <tr>
+                    <th style="padding: 12px; border: 1px solid #ddd; text-align: left;">N° Doc</th>
+                    <th style="padding: 12px; border: 1px solid #ddd; text-align: left;">Vencimiento</th>
+                    <th style="padding: 12px; border: 1px solid #ddd; text-align: right;">Monto</th>
+                </tr>
+            </thead>
+            <tbody>
+        """
+        for inv in invoices:
+            html_table += f"""
+                <tr>
+                    <td style="padding: 8px; border: 1px solid #ddd;">{inv.document_number or 'S/N'}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd;">{inv.due_date}</td>
+                    <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">${inv.amount:,.0f}</td>
+                </tr>
+            """
+        html_table += """
+            </tbody>
+        </table>
+        <br>
+        """
+
+    final_body = f"{body_content}\n{html_table}"
     
     # Send Email (Mock or Real)
-    # For now we print to console/log as we don't have real SMTP creds configured in env yet
     print(f"--- SENDING EMAIL TO {client.email} ---")
     print(f"Subject: {subject}")
-    print(f"Body: {body}")
+    print(f"Body: {final_body}")
     print("---------------------------------------")
     
     # Record notification

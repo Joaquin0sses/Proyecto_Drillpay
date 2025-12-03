@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base, SessionLocal
-from routers import auth, invoices, clients, dashboard, emails
+from routers import auth, invoices, clients, dashboard, emails, predictions
 import models
 import time
 from sqlalchemy.exc import OperationalError
@@ -76,6 +76,7 @@ app.include_router(invoices.router)
 app.include_router(clients.router)
 app.include_router(dashboard.router)
 app.include_router(emails.router)
+app.include_router(predictions.router)
 
 @app.get("/")
 def read_root():

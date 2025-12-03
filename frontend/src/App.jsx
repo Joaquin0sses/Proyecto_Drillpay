@@ -4,6 +4,7 @@ import Dashboard from './components/Dashboard'
 import Invoices from './components/Invoices'
 import Layout from './components/Layout'
 import Templates from './components/Templates'
+import RiskAnalysis from './components/RiskAnalysis'
 import { useState } from 'react'
 
 function App() {
@@ -38,6 +39,13 @@ function App() {
                     <ProtectedRoute>
                         <Layout>
                             <Templates />
+                        </Layout>
+                    </ProtectedRoute>
+                } />
+                <Route path="/risk" element={
+                    <ProtectedRoute>
+                        <Layout>
+                            <RiskAnalysis />
                         </Layout>
                     </ProtectedRoute>
                 } />

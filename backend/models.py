@@ -73,3 +73,4 @@ class EmailTemplate(Base):
     name = Column(String, unique=True, default="default")
     subject = Column(String, default="Recordatorio de Pago")
     body = Column(Text, default="Estimado {cliente},\n\nLe recordamos que tiene facturas pendientes por un total de {monto}.\n\nAtentamente,\nDrillPay")
+    include_table = Column(Integer, default=0) # 0=False, 1=True (using Integer for SQLite compatibility if needed, though Boolean is fine)
